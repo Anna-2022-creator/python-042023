@@ -9,10 +9,11 @@ import statsmodels.formula.api  as smf
 data = pandas.read_csv("Life-Expectancy-Data-Updated.csv")
 
 # výběr roku 2015
-print(data[data["Year"]==2015])
-data.to_csv("Life_Expactancy_2015.csv")
+data_2015 = (data[data["Year"]==2015])
+data_2015.to_csv("Life_Expactancy_2015_new.csv")
 
-data_2015= pandas.read_csv("Life_Expactancy_2015.csv")
+data_2015= pandas.read_csv("Life_Expactancy_2015_new.csv")
+#print(data_2015.head(25))
 
 #graf regrese
 #seaborn.regplot(data_2015, x="GDP_per_capita", y ="Life_expectancy", line_kws={"color":"r"}, scatter_kws={"s":1})
@@ -21,29 +22,29 @@ data_2015= pandas.read_csv("Life_Expactancy_2015.csv")
 #odstranit odlehlé hodnoty
 #data_2015["Life_expactancy_zscore"] = numpy.abs(stats.zscore(data_2015["Life_expectancy"]))
 #data_2015 = data_2015[data_2015["Life_expactancy_zscore"] <3]
-seaborn.regplot(data_2015, x="GDP_per_capita", y ="Life_expectancy", line_kws={"color":"r"}, scatter_kws={"s":1})
+#seaborn.regplot(data_2015, x="GDP_per_capita", y ="Life_expectancy", line_kws={"color":"r"}, scatter_kws={"s":1})
 #plt.show()
 
+#odlehlé hodnoty v datech nebyly vyhodnoceny
 
 # formula = výpočet parametrů rovnice
-#formula = "Life_expectancy ~ GDP_per_capita"
-#mod = smf.ols(formula, data_2015)
-#res = mod.fit()
+formula = "Life_expectancy ~ GDP_per_capita"
+mod = smf.ols(formula, data_2015)
+res = mod.fit()
 #print(res.summary())
 
 #výsledek:
-# Intercept         65.1186 (v případě odebrání ZScore: 65.1442)
-# GDP_per_capita     0.0003 (v případě odebrání ZScore: stejné)
-#  R-squared:         0.340 (v případě odebrání ZScore: 0.341) = koeficient determinace - tato hodnota mi vychází jinak, než je v nápovědě
-
+# Intercept         67.9538 
+# GDP_per_capita     0.0003 
+#  R-squared:         0.396  = koeficient determinace 
 
 #rezidua
-#data_2015 ["residuals"] = res.resid 
-#data_2015 ["predictions"] = res.fittedvalues
+data_2015 ["residuals"] = res.resid 
+data_2015 ["predictions"] = res.fittedvalues
 #print(data_2015[["GDP_per_capita", "Life_expectancy", "predictions", "residuals"]])
 #print(res.summary())
 #výsledek:
-# rezidua nemají normální rozdělení (ProbOmnibus=0, Prob(JB)=2.85e-95 -> to je méně než hladina významnosti P-Value = 0.05; skew = -0.953 )
+# rezidua nemají normální rozdělení (ProbOmnibus=0, Prob(JB)=2.31e-05 -> to je méně než hladina významnosti P-Value = 0.05; skew = -0.846 )
 # data nemají normální rozdělení
 
 #proto data uprávíme - zlogaritmovat
@@ -58,16 +59,17 @@ data_2015 ["predictions"] = res.fittedvalues
 # výsledek: data ani po logaritimizaci nemají normální rozdělení
 
 
-# robustní regrese (vrátit do modelu odlehlé hodnoty)
+# robustní regrese 
 data_x = data_2015[["GDP_per_capita"]]
 data_x = sm.add_constant(data_x)
-mod = sm.RLM(data["Life_expectancy"], data_x)
+mod = sm.RLM(data_2015["Life_expectancy"], data_x)
 res = mod.fit()
-#print(sum(numpy.abs(res.resid))) - součet chyb (17280.622635269086) -> pak můžeme porovnat s modelem s více proměnnými
+#print(sum(numpy.abs(res.resid))) 
+#součet chyb (867.0180301900549) -> pak můžeme porovnat s modelem s více proměnnými
 #print(res.summary())
 
 # výsledek:
-# const             65.9672 (podobná hodnota)
+# const             68.4623 (podobná hodnota)
 #GDP_per_capita     0.0003 (stejná hodnota)
 
 
@@ -79,53 +81,53 @@ res = mod.fit()
 formula = "Life_expectancy ~ GDP_per_capita + Schooling + Incidents_HIV + Diphtheria + Polio + BMI + Measles"
 mod = smf.ols(formula, data_2015)
 res = mod.fit()
-print(res.summary())
+#print(res.summary())
 
 #výsledky:
-# Intercept         29.2899
-# GDP_per_capita     0.0001
-# Schooling          0.7546 
-#Incidents_HIV     -1.5509
-#Diphtheria         0.0672
-# Polio              0.1158
-# BMI                0.6891
-# Measles            0.009
+#                     coef    std err          t      P>|t|      [0.025      0.975]
+#----------------------------------------------------------------------------------
+#Intercept         37.9443      4.016      9.449      0.000      30.018      45.871
+#GDP_per_capita     0.0001   1.96e-05      5.565      0.000    7.05e-05       0.000
+#Schooling          0.8445      0.146      5.791      0.000       0.557       1.132
+#Incidents_HIV     -1.4128      0.173     -8.154      0.000      -1.755      -1.071
+#Diphtheria        -0.0035      0.051     -0.067      0.946      -0.105       0.098
+#Polio              0.1385      0.060      2.304      0.022       0.020       0.257
+#BMI                0.4254      0.161      2.646      0.009       0.108       0.743
+#Measles            0.0390      0.023      1.731      0.085      -0.005       0.083
 
-# R-squared:        0.824 - koeficient determinace se zvýšil -> model je lepší než pouze s jednou proměnnou
+# R-squared:         0.790 - koeficient determinace se významně zvýšil -> model je lepší než pouze s jednou proměnnou
 
-#Prob(Omnibus):     0.000
-# Prob(JB):         1.31e-10
-# opět zamítáme nulovou hypotézu o normalitě dat - data nemají narmální rozdělení
+#Prob(Omnibus):     0.143
+# Prob(JB):         0.138
+# přijímame nulovou hypotézu o normalitě dat - data mají normální rozdělení
 
 
 # přidáme další proměnné do modelu - robustní regrese:
 data_x = data_2015[["GDP_per_capita", "Schooling", "Incidents_HIV", "Diphtheria", "Polio", "BMI", "Measles"]]
 data_x = sm.add_constant(data_x)
-mod = sm.RLM(data["Life_expectancy"], data_x)
+mod = sm.RLM(data_2015["Life_expectancy"], data_x)
 res = mod.fit()
 #print(sum(numpy.abs(res.resid)))
-#součet chyb (9229.766184692917) -> přidáním dalších proměnných do modelu se celková chyba snížila cca na polovinu, tj. model je lepší
+#součet chyb (520.9003582976922) -> přidáním dalších proměnných do modelu se celková chyba snížila cca o 40%, tj. model je lepší
 
-# print(res.summary())
+#print(res.summary())
 # výsledek:
 #GDP_per_capita     0.0001  - pozitivní vliv, slabý - výše HDP pozitivně ovliňuje oč.věk dožití (přidáním dalších proměnných do modelu se tento koeficient snížil)
-#Schooling          0.7382 - vysoký vliv pozitivní - čím delší školní docházka, tím vyšší oč.věk dožití
-#Incidents_HIV     -1.6123 - záporné znaménko - negativně ovlivňuje proměnnou - čím více nemocných, tím víc klesá oč.věk dožití populace
-#Diphtheria         0.0635 - pozitivní vliv - čím vyšší procento očkovaných, tím vyšší oč.věk dožití
-#Polio              0.1213 - pozitivní vliv - čím vyšší procento očkovaných, tím vyšší oč.věk dožití
-#BMI                0.6708 - vysoký vliv pozitivní - tento koeficient bych z analýzy vynechala - není jednoznačný, jelikož příliš nízké i příliš vysoké BMI negativně ovlivňují zdraví
-#Measles            0.0099 - pozitivní vliv - čím vyšší procento očkovaných, tím vyšší oč.věk dožití
+#Schooling          0.8547 - vysoký vliv pozitivní - čím delší školní docházka, tím vyšší oč.věk dožití
+#Incidents_HIV     -1.4564 - záporné znaménko - negativně ovlivňuje proměnnou - čím více nemocných, tím víc klesá oč.věk dožití populace
+#Diphtheria        -0.0061 - negativní vliv - překvapivě, očekávala bych pozitivní vliv jako v případě jiných očkování
+#Polio              0.1387 - pozitivní vliv - čím vyšší procento očkovaných, tím vyšší oč.věk dožití
+#BMI                0.3829 - pozitivní vliv - tento koeficient bych z analýzy vynechala - není jednoznačný, jelikož příliš nízké i příliš vysoké BMI negativně ovlivňují zdraví
+#Measles            0.0409 - pozitivní vliv - čím vyšší procento očkovaných, tím vyšší oč.věk dožití
 
 
-# Pokud jsi nezamítl(a) hypotézu normality, podívej se do sloupce P>|t| a vyber řádek s nejvyšší p-hodnotou. 
-#Dle nápovědy jsou p-hodnoty testů normality 0.143 a 0.138 - tj. více než 0.05, proto platí, že data mají N-rozdělení. 
-# Koeficient pro daný řádek odeber z modelu. Jak se změnila hodnota ostatních koeficientů? 
-# v mém výsledku jsou P-value = 0, pouze u Measles je P = 0.497. 
-#Odeberu Measles z modelu.
+# Hypotéza o N-rozdělení platí, proto vyberu řádek s nejvyšší p-hodnotou (viz výše, regresní analýza):
+# Diphtheria: P-Value je  0.946
+
 # Jak se změnil koeficient determinace? 
-# formula = výpočet parametrů rovnice
-formula = "Life_expectancy ~ GDP_per_capita + Schooling + Incidents_HIV + Diphtheria + Polio + BMI "
+#formula = výpočet parametrů rovnice
+formula = "Life_expectancy ~ GDP_per_capita + Schooling + Incidents_HIV  + Polio + BMI + Measles "
 mod = smf.ols(formula, data_2015)
 res = mod.fit()
 print(res.summary())
-# Koeficient determinace se nezměnil. Tj. tato proměnná (Measles) nemá na závislou proměnnou vliv.
+# Koeficient determinace (0.790) se nezměnil. Tj. tato proměnná (Diphtheria) nemá na závislou proměnnou vliv.
