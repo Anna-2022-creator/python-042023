@@ -1,0 +1,139 @@
+import pandas
+from sklearn.tree import DecisionTreeClassifier
+from sklearn.metrics import ConfusionMatrixDisplay, accuracy_score, precision_score, recall_score
+from sklearn.model_selection import train_test_split, GridSearchCV
+from sklearn.preprocessing import OneHotEncoder
+from sklearn.tree import export_graphviz
+from six import StringIO
+from IPython.display import Image  
+import pydotplus
+from pydotplus import graph_from_dot_data
+from sklearn.preprocessing import StandardScaler
+from sklearn.neighbors import KNeighborsClassifier
+import matplotlib.pyplot as plt
+from sklearn.svm import LinearSVC, SVC
+
+import os
+os.environ["PATH"] += os.pathsep + r'C:\Program Files\Graphviz\bin'
+
+data = pandas.read_csv("ukol_04_data.csv")
+#print(data.head())
+
+import numpy
+
+#část 1
+
+y = data["y"]
+
+categorical_columns = ["job", "marital", "education", "default", "housing", "loan", "contact", "campaign", "poutcome"]
+numeric_columns = ["age", "balance", "duration", "pdays", "previous"]
+numeric_data = data[numeric_columns].to_numpy()
+
+encoder = OneHotEncoder()
+encoded_columns = encoder.fit_transform(data[categorical_columns])
+encoded_columns = encoded_columns.toarray()
+
+X = numpy.concatenate([encoded_columns, numeric_data], axis=1)
+
+#print(X)
+
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=42)
+
+clf = DecisionTreeClassifier(random_state=42, max_depth=4)
+clf = clf.fit(X_train, y_train)
+y_pred = clf.predict(X_test)
+
+dot_data = StringIO()
+export_graphviz(clf, out_file=dot_data, filled=True, feature_names=list(encoder.get_feature_names_out()) + numeric_columns, class_names=["no", "yes"])
+graph = pydotplus.graph_from_dot_data(dot_data.getvalue())  
+#graph.write_png('tree.png')
+
+ConfusionMatrixDisplay.from_estimator(clf, X_test, y_test)
+#plt.show()
+
+
+
+# matice záměn: př.: True + predicted label: 
+# př. No + No -> 12917 - udává, že model a zároveň i realné hodnoty ve 12917 případech značí, že klienti nemají termínovaný účet
+# př. No + Yes -> 292 - model nesprávně uvedl, že ve 292 případech klient má term.účet, i když reálně ho nemá (True label = no)
+
+#metriky:
+#print(accuracy_score(y_test, y_pred))
+#print(precision_score(y_test, y_pred, pos_label="yes"))
+#print(recall_score(y_test, y_pred, pos_label="yes"))
+
+#Vedení marketingového oddělení se chce vyhnout zbytečnému kontaktování klientů, kteří o termínovaný účet nemají zájem. 
+#Nevadí, pokud se neozvou někomu, kdo o termínovaný vklad zájem má. Vyber podle této preference vedení vhodnou metriku.
+# -> Vhodná metrika je precision score - Čím více klientů bez zájmu o term.účet označíme, že mají zájem, tím má metrika menší hodnotu. 
+# Metrika nepočítá s tím, kolik klientů se zájmem o účet jsme označili za klienty, kteří zájem nemají.
+
+
+#0.9018096514745308 = accuracy score -> tj. je cca 90 % - model je velmi přesný (90% správně určených záznamů)
+# 0.6481927710843374 = precision score -> tj. cca 65 %  
+# recall = 0.31443600233781416 (nezajímá nás v tomto případě)
+
+
+# část 2 a 3
+
+scaler = StandardScaler()
+numeric_data = scaler.fit_transform(data[numeric_columns])
+
+encoder = OneHotEncoder()
+encoded_columns = encoder.fit_transform(data[categorical_columns])
+encoded_columns = encoded_columns.toarray()
+
+X = numpy.concatenate([encoded_columns, numeric_data], axis=1)
+
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=42, stratify = y)
+
+
+model_1 = KNeighborsClassifier()
+params_1 = {"n_neighbors": range(1, 31, 2)}
+clf_1 = GridSearchCV(model_1, params_1, scoring="accuracy")
+clf_1.fit(X, y)
+
+#print(clf_1.best_params_)
+#print(round(clf_1.best_score_, 2))
+#print(precision_score(y_test, y_pred, pos_label="yes"))
+
+# první rozmezí : 1 až 31:
+# vyšlo mi n-neighbors = 25  a  0.88
+
+# druhé rozmezí jsem dala 3 až 7
+# výsledek {'n_neighbors': 5} a 0.87
+
+#třetí rozmezí 7 až 11
+# výsledek {'n_neighbors': 9 } a 0.87
+
+#čtvrté rozmezí 11 až 15
+#{'n_neighbors': 13} a 0.88
+
+# páté rozmezí 15 až 19
+#{'n_neighbors': 17} a 0.88
+
+# šesté rozmezí 19 až 23
+#{'n_neighbors': 21} a 0.88
+
+# při zadání rozmezí 1 až 31 bylo výsledkem 'n_neighbors': 25 a přesností 0.88
+# nicméně při zadávání dílčích intervalů je vidět že od #{'n_neighbors': 13} je přesnost na úrovni 0.88
+
+
+
+
+model_2 = SVC(kernel="linear")
+params_2 = {"decision_function_shape": ["ovo", "ovr"]}
+
+clf_2 = GridSearchCV(model_2, params_2, scoring="accuracy")
+clf_2.fit(X, y)
+
+print(clf_2.best_params_)
+print(round(clf_2.best_score_, 2))
+print(precision_score(y_test, y_pred, pos_label="yes"))
+
+# výsledek 0.89 a metoda ovo - one to one
+
+
+# nepjpřesněji vychází metoda rozhodovacího stromu s hloubkou 4 (accuracy score je 90,18 %)
+
+# bonus - např. pro hloubku rozh.stromu = 5 vychází accuracy = 0.9004691689008043
+# bonus - pro hloubku = 10 je accuracy = 0.8979222520107238
