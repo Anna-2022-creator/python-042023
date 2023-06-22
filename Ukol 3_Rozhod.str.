@@ -12,6 +12,7 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.neighbors import KNeighborsClassifier
 import matplotlib.pyplot as plt
 from sklearn.svm import LinearSVC, SVC
+from sklearn.metrics import precision_score, make_scorer
 
 import os
 os.environ["PATH"] += os.pathsep + r'C:\Program Files\Graphviz\bin'
@@ -35,7 +36,7 @@ encoded_columns = encoded_columns.toarray()
 
 X = numpy.concatenate([encoded_columns, numeric_data], axis=1)
 
-#print(X)
+print(X)
 
 X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=42)
 
@@ -46,10 +47,10 @@ y_pred = clf.predict(X_test)
 dot_data = StringIO()
 export_graphviz(clf, out_file=dot_data, filled=True, feature_names=list(encoder.get_feature_names_out()) + numeric_columns, class_names=["no", "yes"])
 graph = pydotplus.graph_from_dot_data(dot_data.getvalue())  
-#graph.write_png('tree.png')
+graph.write_png('tree.png')
 
 ConfusionMatrixDisplay.from_estimator(clf, X_test, y_test)
-#plt.show()
+plt.show()
 
 
 
@@ -58,9 +59,9 @@ ConfusionMatrixDisplay.from_estimator(clf, X_test, y_test)
 # př. No + Yes -> 292 - model nesprávně uvedl, že ve 292 případech klient má term.účet, i když reálně ho nemá (True label = no)
 
 #metriky:
-#print(accuracy_score(y_test, y_pred))
-#print(precision_score(y_test, y_pred, pos_label="yes"))
-#print(recall_score(y_test, y_pred, pos_label="yes"))
+print(accuracy_score(y_test, y_pred))
+print(precision_score(y_test, y_pred, pos_label="yes"))
+print(recall_score(y_test, y_pred, pos_label="yes"))
 
 #Vedení marketingového oddělení se chce vyhnout zbytečnému kontaktování klientů, kteří o termínovaný účet nemají zájem. 
 #Nevadí, pokud se neozvou někomu, kdo o termínovaný vklad zájem má. Vyber podle této preference vedení vhodnou metriku.
@@ -84,56 +85,51 @@ encoded_columns = encoded_columns.toarray()
 
 X = numpy.concatenate([encoded_columns, numeric_data], axis=1)
 
-X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=42, stratify = y)
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=42)
 
 
 model_1 = KNeighborsClassifier()
-params_1 = {"n_neighbors": range(1, 31, 2)}
-clf_1 = GridSearchCV(model_1, params_1, scoring="accuracy")
+params_1 = {"n_neighbors": (1, 32, 2)}
+precision_scorer = make_scorer(precision_score, pos_label="yes")
+clf_1 = GridSearchCV(model_1, params_1, scoring=precision_scorer)
+
 clf_1.fit(X, y)
+y_pred = clf_1.predict(X_test)
 
-#print(clf_1.best_params_)
-#print(round(clf_1.best_score_, 2))
-#print(precision_score(y_test, y_pred, pos_label="yes"))
-
-# první rozmezí : 1 až 31:
-# vyšlo mi n-neighbors = 25  a  0.88
-
-# druhé rozmezí jsem dala 3 až 7
-# výsledek {'n_neighbors': 5} a 0.87
-
-#třetí rozmezí 7 až 11
-# výsledek {'n_neighbors': 9 } a 0.87
-
-#čtvrté rozmezí 11 až 15
-#{'n_neighbors': 13} a 0.88
-
-# páté rozmezí 15 až 19
-#{'n_neighbors': 17} a 0.88
-
-# šesté rozmezí 19 až 23
-#{'n_neighbors': 21} a 0.88
-
-# při zadání rozmezí 1 až 31 bylo výsledkem 'n_neighbors': 25 a přesností 0.88
-# nicméně při zadávání dílčích intervalů je vidět že od #{'n_neighbors': 13} je přesnost na úrovni 0.88
+print(clf_1.best_params_)
+print(round(clf_1.best_score_, 2))
+print(precision_score(y_test, y_pred, pos_label="yes"))
 
 
-
+# nejlepším výsledkem je 'n_neighbors': 19 a precision 0.56
 
 model_2 = SVC(kernel="linear")
 params_2 = {"decision_function_shape": ["ovo", "ovr"]}
 
 clf_2 = GridSearchCV(model_2, params_2, scoring="accuracy")
 clf_2.fit(X, y)
-
+y_pred = clf_2.predict(X_test)
 print(clf_2.best_params_)
 print(round(clf_2.best_score_, 2))
+
 print(precision_score(y_test, y_pred, pos_label="yes"))
 
-# výsledek 0.89 a metoda ovo - one to one
+
+scaler = StandardScaler()
+X_train = scaler.fit_transform(X_train)
+X_test = scaler.transform(X_test)
+
+clf_2 = LinearSVC()
+clf_2.fit(X_train, y_train)
+y_pred = clf_2.predict(X_test)
+print(precision_score(y_test, y_pred, pos_label="yes"))
+
+# výsledek 0.66
 
 
-# nepjpřesněji vychází metoda rozhodovacího stromu s hloubkou 4 (accuracy score je 90,18 %)
+# nepjpřesněji mi nevychází metoda rozhodovacího stromu s hloubkou 4 ( precision score je cca 65 %) ale metoda LinearSVC s 66% hodnotou metriky precision
+
+
 
 # bonus - např. pro hloubku rozh.stromu = 5 vychází accuracy = 0.9004691689008043
 # bonus - pro hloubku = 10 je accuracy = 0.8979222520107238
